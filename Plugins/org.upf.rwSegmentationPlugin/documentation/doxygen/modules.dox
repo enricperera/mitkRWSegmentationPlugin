@@ -1,0 +1,16 @@
+/**
+  \defgroup org_upf_rwSegmentationPlugin org.upf.rwSegmentationPlugin
+  \ingroup MITKPlugins
+
+  \brief Describe your plugin here.
+
+*/
+
+/**
+  \defgroup org_upf_rwSegmentationPlugin_internal Internal
+  \ingroup org_upf_rwSegmentationPlugin
+
+  \brief This subcategory includes the internal classes of the org.upf.rwSegmentationPlugin plugin. Other
+  plugins must not rely on these classes. They contain implementation details and their interface
+  may change at any time. We mean it.
+*/
