@@ -23,13 +23,11 @@
 
   - https://github.com/enricperera/itkRWSegmentationFilter
 
-  Following you 
-  can find the homepages for the libraries used, and the versions which have 
-  been used during the development, although other versions might also 
-  work.
+  Following you can find the homepages for the libraries used, and the versions which have been used during the development, although other versions might also work.
 
   - MITK (2018.04.2): https://github.com/MITK/MITK
   - Eigen3 (3.3.4-4): http://eigen.tuxfamily.org/index.php?title=Main_Page#Download
+  - OpenMP: https://www.openmp.org/resources/openmp-compilers-tools/
   - CUDA Toolkit (9.1): https://developer.nvidia.com/cuda-toolkit 
 
 
