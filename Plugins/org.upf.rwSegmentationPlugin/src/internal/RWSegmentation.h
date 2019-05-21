@@ -53,13 +53,16 @@ protected slots:
   /// \brief Called when the user clicks the GUI button
   void DoRWSegmentation();
   void OnGpuRadioButtonToggled(bool checked);
+  void OnAddPushButton();
+  void OnRemovePushButton();
+  void OnRemoveAllPushButton();
 
 protected:
   virtual void CreateQtPartControl(QWidget *parent) override;
 
   virtual void SetFocus() override;
 
-  LabelImageType::Pointer MergeLabels(mitk::Image::Pointer labelMitkForegroundImage, mitk::Image::Pointer labelMitkBackgroundImage);
+  LabelImageType::Pointer ComputeLabelImage();
 
   Ui::RWSegmentationControls m_Controls;
 };

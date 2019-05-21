@@ -31,7 +31,8 @@ See LICENSE.txt or http://www.mitk.org for details.
 #include <mitkNodePredicateProperty.h>
 
 // ITK
-#include <itkImageRegionIterator.h>
+#include "itkAddImageFilter.h"
+#include "itkBinaryThresholdImageFilter.h"
 
 // RW filters
 #include "itkRWSegmentationFilter/itkRWSegmentationFilter.h"
@@ -61,15 +62,41 @@ void RWSegmentation::CreateQtPartControl(QWidget *parent)
 
   m_Controls.imageComboBox->SetDataStorage(this->GetDataStorage());
   m_Controls.imageComboBox->SetPredicate(mitk::TNodePredicateDataType<mitk::Image>::New());
-  m_Controls.foregroundComboBox->SetDataStorage(this->GetDataStorage());
-  m_Controls.foregroundComboBox->SetPredicate(mitk::TNodePredicateDataType<mitk::Image>::New());
-  m_Controls.backgroundComboBox->SetDataStorage(this->GetDataStorage());
-  m_Controls.backgroundComboBox->SetPredicate(mitk::TNodePredicateDataType<mitk::Image>::New());
 
   connect(m_Controls.DoSegmentation, SIGNAL(clicked()), this, SLOT(DoRWSegmentation()));
+  connect(m_Controls.addPushButton, SIGNAL(clicked()), this, SLOT(OnAddPushButton()));
+  connect(m_Controls.removePushButton, SIGNAL(clicked()), this, SLOT(OnRemovePushButton()));
+  connect(m_Controls.removeAllPushButton, SIGNAL(clicked()), this, SLOT(OnRemoveAllPushButton()));
   connect(m_Controls.gpuRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnGpuRadioButtonToggled(bool)));
 
   this->OnGpuRadioButtonToggled(false);
+}
+
+void RWSegmentation::OnAddPushButton()
+{
+  QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+  if (nodes.empty())
+    return;
+
+  mitk::DataNode *node = nodes.front();
+  if (!node)
+    return;
+
+  mitk::Image *image = dynamic_cast<mitk::Image *>(node->GetData());
+  if (image)
+  {
+    m_Controls.labelImagesListWidget->addItem(QString::fromStdString(node->GetName()));
+  }
+}
+
+void RWSegmentation::OnRemovePushButton()
+{
+  m_Controls.labelImagesListWidget->takeItem(m_Controls.labelImagesListWidget->currentRow());
+}
+
+void RWSegmentation::OnRemoveAllPushButton()
+{
+  m_Controls.labelImagesListWidget->clear();
 }
 
 void RWSegmentation::OnGpuRadioButtonToggled(bool checked)
@@ -89,24 +116,24 @@ void RWSegmentation::OnGpuRadioButtonToggled(bool checked)
 // Do RW segmentation
 void RWSegmentation::DoRWSegmentation()
 {
-  if (m_Controls.imageComboBox->GetSelectedNode() == nullptr ||
-      m_Controls.imageComboBox->GetSelectedNode() == m_Controls.foregroundComboBox->GetSelectedNode() ||
-      m_Controls.imageComboBox->GetSelectedNode() == m_Controls.backgroundComboBox->GetSelectedNode() ||
-      m_Controls.backgroundComboBox->GetSelectedNode() == m_Controls.foregroundComboBox->GetSelectedNode())
+  if (m_Controls.imageComboBox->GetSelectedNode() == nullptr)
   {
-    MITK_INFO << "Please select the image, the foreground segmentation and the background segmentation and ensure they are the correct ones.";
+    MITK_INFO << "Please select an image.";
     return;
   }
   mitk::DataNode::Pointer imageNode = m_Controls.imageComboBox->GetSelectedNode();
   mitk::Image::Pointer inputMitkImage = dynamic_cast<mitk::Image *>(imageNode->GetData());
-  mitk::Image::Pointer labelMitkForegroundImage = dynamic_cast<mitk::Image *>(m_Controls.foregroundComboBox->GetSelectedNode()->GetData());
-  mitk::Image::Pointer labelMitkBackgroundImage = dynamic_cast<mitk::Image *>(m_Controls.backgroundComboBox->GetSelectedNode()->GetData());
 
   InputImageType::Pointer inputItkImage = InputImageType::New();
   CastToItkImage(inputMitkImage, inputItkImage); //OK, now you can use inputItkImage whereever you want
 
   // Get label image
-  LabelImageType::Pointer labelImage = RWSegmentation::MergeLabels(labelMitkForegroundImage, labelMitkBackgroundImage);
+  LabelImageType::Pointer labelImage = this->ComputeLabelImage();
+  if (labelImage == nullptr)
+  {
+    MITK_INFO << "Please select label images.";
+    return;
+  }
 
   // Define output image
   mitk::Image::Pointer outputImage = mitk::Image::New();
@@ -161,68 +188,70 @@ void RWSegmentation::DoRWSegmentation()
   return;
 }
 
-LabelImageType::Pointer RWSegmentation::MergeLabels(mitk::Image::Pointer labelMitkForegroundImage, mitk::Image::Pointer labelMitkBackgroundImage)
+LabelImageType::Pointer RWSegmentation::ComputeLabelImage()
 {
-  LabelImageType::Pointer labelForegroundImage = LabelImageType::New();
-  LabelImageType::Pointer labelBackgroundImage = LabelImageType::New();
-
-  CastToItkImage(labelMitkForegroundImage, labelForegroundImage); //OK, now you can use inputItkImage whereever you want
-  CastToItkImage(labelMitkBackgroundImage, labelBackgroundImage); //OK, now you can use inputItkImage whereever you want
-
-  typedef itk::ImageRegionConstIterator<LabelImageType> ConstIteratorImageType;
-  typedef itk::ImageRegionIterator<LabelImageType> IteratorImageType;
-
-  LabelImageType::RegionType region = labelForegroundImage->GetLargestPossibleRegion();
-  LabelImageType::SpacingType spacing = labelForegroundImage->GetSpacing();
-  LabelImageType::PointType origin = labelForegroundImage->GetOrigin();
-
-  LabelImageType::RegionType region2 = labelBackgroundImage->GetLargestPossibleRegion();
-
-  LabelImageType::Pointer outputLabels = LabelImageType::New();
-
-  // Define output image (segmentation image) properties
-  LabelImageType::RegionType outputRegion;
-  LabelImageType::RegionType::IndexType outputStart;
-  outputStart[0] = 0;
-  outputStart[1] = 0;
-  outputStart[2] = 0;
-
-  LabelImageType::RegionType::SizeType size;
-  size[0] = region.GetSize()[0];
-  size[1] = region.GetSize()[1];
-  size[2] = region.GetSize()[2];
-
-  outputRegion.SetSize(size);
-  outputRegion.SetIndex(outputStart);
-
-  outputLabels->SetRegions(outputRegion);
-  outputLabels->SetSpacing(spacing);
-  outputLabels->SetOrigin(origin);
-  outputLabels->Allocate();
-
-  ConstIteratorImageType it1(labelForegroundImage, region);
-  ConstIteratorImageType it2(labelBackgroundImage, region2);
-  IteratorImageType it3(outputLabels, outputRegion);
-
-  it1.GoToBegin();
-  it2.GoToBegin();
-  it3.GoToBegin();
-
-  while (!it1.IsAtEnd())
+  int numberOfLabelImages = m_Controls.labelImagesListWidget->count();
+  if (numberOfLabelImages < 1)
+    return nullptr; // Return if no label images are selected
+  else if (numberOfLabelImages == 1)
   {
-    if (it1.Get() == 1 && it2.Get() == 0)
-      it3.Set(1);
-    else if (it1.Get() == 0 && it2.Get() == 1)
-      it3.Set(2);
-    else if (it1.Get() != 0 && it2.Get() != 0)
-      it3.Set(0);
-    else
-      it3.Set(0);
+    // Return the image itself, assuming it is an image that includes all the labels, with a different pixel value for each label
+    QString nodeName = m_Controls.labelImagesListWidget->item(0)->text();
+    mitk::DataNode::Pointer node = this->GetDataStorage()->GetNamedNode(nodeName.toStdString());
+    mitk::Image::Pointer image1 = dynamic_cast<mitk::Image *>(node->GetData());
 
-    ++it1;
-    ++it2;
-    ++it3;
+    LabelImageType::Pointer outputLabels = LabelImageType::New();
+    CastToItkImage(image1, outputLabels);
+    return outputLabels;
   }
+  else
+  {
+    // Assume each image is a mask by itsel. Each image is binarized so all non-zero pixels are set to 0,1,...,N
+    // The images are added into a single image, where all the labels will be included, each with a different pixel value.
+    QString nodeName = m_Controls.labelImagesListWidget->item(0)->text();
+    mitk::DataNode::Pointer node = this->GetDataStorage()->GetNamedNode(nodeName.toStdString());
+    mitk::Image::Pointer image1 = dynamic_cast<mitk::Image *>(node->GetData());
 
-  return outputLabels;
+    LabelImageType::Pointer outputLabels = LabelImageType::New();
+    CastToItkImage(image1, outputLabels);
+
+    // Binarize all images
+    typedef itk::BinaryThresholdImageFilter<LabelImageType, LabelImageType> BinaryThresholdImageFilterType;
+    BinaryThresholdImageFilterType::Pointer thresholdFilter1 = BinaryThresholdImageFilterType::New();
+    thresholdFilter1->SetInput(outputLabels);
+    thresholdFilter1->SetLowerThreshold(1);
+    thresholdFilter1->SetUpperThreshold(255);
+    thresholdFilter1->SetInsideValue(1);
+    thresholdFilter1->SetOutsideValue(0);
+    thresholdFilter1->Update();
+
+    outputLabels = thresholdFilter1->GetOutput();
+
+    for (int i = 1; i != numberOfLabelImages; ++i)
+    {
+      QString nodeName = m_Controls.labelImagesListWidget->item(i)->text();
+      mitk::DataNode::Pointer node = this->GetDataStorage()->GetNamedNode(nodeName.toStdString());
+      mitk::Image::Pointer image2 = dynamic_cast<mitk::Image *>(node->GetData());
+
+      LabelImageType::Pointer itkLabelImage2 = LabelImageType::New();
+      CastToItkImage(image2, itkLabelImage2); //OK, now you can use inputItkImage whereever you want
+
+      BinaryThresholdImageFilterType::Pointer thresholdFilter2 = BinaryThresholdImageFilterType::New();
+      thresholdFilter2->SetInput(itkLabelImage2);
+      thresholdFilter2->SetLowerThreshold(1);
+      thresholdFilter2->SetUpperThreshold(255);
+      thresholdFilter2->SetInsideValue(i + 1);
+      thresholdFilter2->SetOutsideValue(0);
+
+      typedef itk::AddImageFilter<LabelImageType, LabelImageType> AddImageFilterType;
+      AddImageFilterType::Pointer addFilter = AddImageFilterType::New();
+      addFilter->SetInput1(outputLabels);
+      addFilter->SetInput2(thresholdFilter2->GetOutput());
+      addFilter->Update();
+
+      outputLabels = addFilter->GetOutput();
+    }
+
+    return outputLabels;
+  }
 }

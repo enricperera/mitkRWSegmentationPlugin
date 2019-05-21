@@ -10,16 +10,15 @@
       vol. 28, no. 11, pp. 1768–1783, nov 2006.
 
   The plug-in allows the user to select the image that they want to segment,
-  as well as two prior segmentations, one corresponding to foreground and
-  the other to background. When executing the algorithm, a binary image
-  corresponding to the segmentation of the foreground will be returned.
+  as well as a single multilabel prior image, or many single label prior imags.
+  The algorithm will return a segmentation image with all the labels (the highest 
+  value label will be assigned a value of 0).
   Additionally, a GPU RW solver will also be installed if the user has
   CUDA in their system. Otherwise, only a CPU solver will be available.
   In any case, the user can specify how many threads the CPU solver can 
   use.
 
-  If no UI is required, or for obtaining a multilable segmentation, the
-  core RW filters (CPU and GPU) can be found here:
+  If no UI is required, the core RW filters (CPU and GPU) can be found here:
 
   - https://github.com/enricperera/itkRWSegmentationFilter
 
@@ -30,6 +29,8 @@
   - OpenMP: https://www.openmp.org/resources/openmp-compilers-tools/
   - CUDA Toolkit (9.1): https://developer.nvidia.com/cuda-toolkit 
 
+
+![](./App_screenshot.png)
 
 **Build:**
 
