@@ -29,6 +29,7 @@
   - OpenMP: https://www.openmp.org/resources/openmp-compilers-tools/
   - CUDA Toolkit (9.1): https://developer.nvidia.com/cuda-toolkit 
 
+**Plugin screenshot:**
 
 ![](./App_screenshot.png)
 
