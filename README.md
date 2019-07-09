@@ -10,7 +10,7 @@
       vol. 28, no. 11, pp. 1768–1783, nov 2006.
 
   The plug-in allows the user to select the image that they want to segment,
-  as well as a single multilabel prior image, or many single label prior imags.
+  as well as a single multi-label prior image, or multiple single-label prior images.
   The algorithm will return a segmentation image with all the labels (the highest 
   value label will be assigned a value of 0).
   Additionally, a GPU RW solver will also be installed if the user has
